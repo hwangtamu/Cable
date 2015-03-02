@@ -3,6 +3,9 @@ __author__ = 'Han Wang'
 import numpy as np
 import matplotlib.pyplot as plt
 
+s = [0, 1, 0]
+
+
 #A resistor unit on membrane
 class R:
     current = np.array([])
@@ -16,6 +19,7 @@ class R:
     def add_voltage(self, volt):
         self.voltage = volt
         self.current = volt/self.resistance
+
 
 #A resistor unit in cytoplasm
 class R_cyto:
@@ -33,6 +37,7 @@ class R_cyto:
         self.voltage = volt
         self.rear_voltage = volt - curr*self.resistor.resistance
 
+
 #A capacitor unit on membrane
 class C:
     current = np.array([])
@@ -47,6 +52,7 @@ class C:
         self.voltage = volt
         whole_volt = np.append([0], volt)
         self.current = ([self.capacitance*(self.voltage[x]-whole_volt[x])/self.clock for x in range(len(self.voltage))])
+
 
 #A RC unit on membrane
 class RC:
@@ -85,11 +91,13 @@ class Unit:
     r_v_out = np.array([])
     voltage = np.array([])  # voltage at the junction between R_cyto and RC
     clock = 0
+    type = 0  # type 1 = head, type 2 = body
 
-    def __init__(self, r_c, r, c, t):
+    def __init__(self, r_c, r, c, t,unit_type):
         self.r_cyto = R_cyto(r_c, t)
         self.rc = RC(r, c, t)
         self.clock = t
+        self.type = unit_type
 
     def add_vc(self, l_v, r_v, l_c, r_c):
         #initialize
@@ -111,12 +119,35 @@ class Unit:
 
 class Injection:
     n = 0
+    dendrite = []
+    resistance_in = 0
+    clock = 0
+    compartment = Unit(0, 0, 0, clock)
 
-    def __init__(self, synapses):
+    def __init__(self, synapses, r_in, r_c, r, c, t):
         self.n = len(synapses)
+        self.resistance_in = r_in
+        self.clock = t
+        self.compartment = Unit(r_c, r, c, t)
+
+    def connect(self):
+        if self.n == 0:
+            pass
+        else:
+            head = self.compartment
+            head.v_c_in = head.l_c_in * self.resistance_in
+            self.dendrite.append(head)
+
+            body = self.compartment
+            for i in range(self.n-1):
+                self.dendrite.append(body)
+                self.dendrite[i].r_c_in = self.dendrite[i+1].r_c_out
+
 # operation
 
 a = 3
+
+
 #current, alpha function, single spike
 def alpha(t, a):
     return a*a*t*np.exp(-a*t)
@@ -127,7 +158,7 @@ def rep_alpha(t, a, n):
     c = np.zeros(len(t))
     if n>0:
         for i in range(n):
-            c += np.piecewise(t, [t <= i, t > i],[0,lambda t:alpha(t-i,a)])
+            c += np.piecewise(t, [t <= i, t > i], [0, lambda t:alpha(t-i, a)])
         return c
 
 time = np.arange(0, 5, 0.02)
